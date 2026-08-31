@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "provider": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "parent", "teacher", "admin"] },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "updatedAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["uid", "role", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    }
+  }
+}

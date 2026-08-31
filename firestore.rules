@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Primitives
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isOwner(userId) { return request.auth.uid == userId; }
+    
+    // Admin check using secure read
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isValidId(id) { 
+       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    // Validation for User
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['uid', 'role', 'createdAt', 'updatedAt', 'accountStatus']) &&
+             data.uid == userId &&
+             data.uid is string && data.uid.size() <= 128 &&
+             data.role in ['student', 'parent', 'teacher', 'admin'] &&
+             data.accountStatus in ['active', 'suspended', 'deleted'] &&
+             (data.get('name', '') is string) && (data.get('name', '').size() <= 200) &&
+             (data.get('displayName', '') is string) && (data.get('displayName', '').size() <= 200) &&
+             (data.get('email', '') is string) && (data.get('email', '').size() <= 200) &&
+             (data.get('phoneNumber', '') is string) && (data.get('phoneNumber', '').size() <= 50) &&
+             (data.get('photoURL', '') is string) && (data.get('photoURL', '').size() <= 1000) &&
+             (data.get('authProvider', '') is string) && (data.get('authProvider', '').size() <= 50) &&
+             (data.get('provider', '') is string) && (data.get('provider', '').size() <= 50);
+    }
+
+    // match /users
+    match /users/{userId} {
+      // Allow read if user is accessing their own profile or is an admin
+      allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      // No blanket list allowed for users
+      allow list: if false; 
+
+      allow create: if isSignedIn() && 
+                       isValidId(userId) && 
+                       isOwner(userId) &&
+                       isValidUser(incoming(), userId) &&
+                       // Prevent self-assigned admin unless they are already an admin
+                       (incoming().role != 'admin' || isAdmin()) &&
+                       incoming().createdAt == request.time &&
+                       incoming().updatedAt == request.time;
+      
+      allow update: if isSignedIn() && 
+                       isValidId(userId) && 
+                       isOwner(userId) &&
+                       isValidUser(incoming(), userId) &&
+                       incoming().uid == existing().uid &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt == request.time &&
+                       (incoming().role == existing().role || isAdmin()) && // user cannot change their own role
+                       (incoming().accountStatus == existing().accountStatus || isAdmin()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'displayName', 'email', 'phoneNumber', 'photoURL', 'authProvider', 'provider', 'updatedAt']);
+      
+      // Admins can update roles
+      allow update: if isAdmin() && 
+                       isValidId(userId) && 
+                       isValidUser(incoming(), userId) &&
+                       incoming().uid == existing().uid &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt == request.time;
+
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+    
+    // Admins Collection
+    match /admins/{userId} {
+      allow read: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow write: if false; // Only manageable from Firebase Console or backend
+    }
+  }
+}

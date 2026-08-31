@@ -1,0 +1,8 @@
+{
+  "name": "Remix BIHAR BOARD",
+  "description": "BIHAR BOARD is a modern digital learning platform for students, offering study materials, online tests, practice questions, smart revision, performance tracking and AI-assisted learning tools—all in one place.\nLearn • Practice • Test • Revise • Succeed\n\nपढ़ाई • अभ्यास • टेस्ट • रिविजन • सफलता - The complete education ecosystem.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
